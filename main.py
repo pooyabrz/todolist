@@ -1,2 +1,4 @@
+from todolist.config import Config
+
 if __name__ == "__main__":
-    pass
+    print(f"Max projects: {Config.MAX_PROJECTS}")
