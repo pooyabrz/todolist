@@ -1,44 +1,85 @@
 from typing import List, Optional
 from datetime import datetime
-from todolist.domain.models import Project, Task, TaskStatus
+from todolist.domain.models import Project, Task
 from todolist.infrastructure.repository import InMemoryRepository
 
+
 class ProjectService:
-    """Business logic for projects."""
+    """Service for managing projects."""
+
     def __init__(self, repo: InMemoryRepository):
         self.repo = repo
 
     def create_project(self, name: str, description: str = "") -> Project:
+        """Create a new project."""
         return self.repo.create_project(name, description)
 
-    def edit_project(self, project_id: int, name: Optional[str] = None, description: Optional[str] = None) -> Optional[Project]:
+    def edit_project(
+        self,
+        project_id: int,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+    ) -> Optional[Project]:
+        """Edit an existing project."""
         return self.repo.update_project(project_id, name, description)
 
     def delete_project(self, project_id: int) -> bool:
+        """Delete a project."""
         return self.repo.delete_project(project_id)
 
     def list_projects(self) -> List[Project]:
+        """List all projects."""
         return self.repo.list_projects()
 
+
 class TaskService:
-    """Business logic for tasks."""
+    """Service for managing tasks."""
+
     def __init__(self, repo: InMemoryRepository):
         self.repo = repo
 
-    def add_task(self, project_id: int, title: str, description: str = "", status: str = "todo", deadline: Optional[str] = None) -> Optional[Task]:
-        deadline_dt = datetime.fromisoformat(deadline) if deadline else None
-        return self.repo.add_task_to_project(project_id, title, description, status, deadline_dt)
+    def add_task(
+        self,
+        project_id: int,
+        title: str,
+        description: str = "",
+        status: str = "todo",
+        deadline: Optional[str] = None,
+    ) -> Optional[Task]:
+        """Add a task to a project.
 
-    def change_task_status(self, project_id: int, task_id: int, new_status: str) -> bool:
-        # Implementation: find task, update status if valid
-        project = self.repo.get_project(project_id)
-        if not project:
-            return False
-        task = next((t for t in project.tasks if t.id == task_id), None)
-        if not task:
-            return False
-        try:
-            task.status = TaskStatus(new_status)
-            return True
-        except ValueError:
-            return False
+        Args:
+            deadline: ISO format string for deadline.
+        """
+        deadline_dt = datetime.fromisoformat(deadline) if deadline else None
+        return self.repo.add_task_to_project(
+            project_id, title, description, status, deadline_dt
+        )
+
+    def change_task_status(
+        self, project_id: int, task_id: int, new_status: str
+    ) -> bool:
+        """Change the status of a task."""
+        return bool(self.repo.update_task(project_id, task_id, status=new_status))
+
+    def edit_task(
+        self,
+        project_id: int,
+        task_id: int,
+        title: Optional[str] = None,
+        description: Optional[str] = None,
+        deadline: Optional[str] = None,
+    ) -> Optional[Task]:
+        """Edit a task's details (excluding status)."""
+        deadline_dt = datetime.fromisoformat(deadline) if deadline else None
+        return self.repo.update_task(
+            project_id, task_id, title, description, deadline=deadline_dt
+        )
+
+    def delete_task(self, project_id: int, task_id: int) -> bool:
+        """Delete a task."""
+        return self.repo.delete_task(project_id, task_id)
+
+    def list_tasks(self, project_id: int) -> List[Task]:
+        """List tasks for a project."""
+        return self.repo.list_tasks(project_id)
