@@ -1,7 +1,7 @@
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, Index
 from sqlalchemy.orm import relationship
-from todolist.db.session import Base
+from src.todolist.db.session import Base
 
 
 class Category(Base):
