@@ -1,140 +1,157 @@
-# To Do List Project (Phase 1 - In-Memory)
+# ToDoList - Phase 2 (Database Integration)
 
-**Prepared for:** Software Engineering Course, AUT  
-**Date:** October 2025  
-**Version:** 1.0.0
+A task management application (ToDoList) with persistent storage in PostgreSQL.
 
-## 📋 Project Overview
+## 🎯 Phase 2 Features
 
-A Python-based ToDoList application built with Object-Oriented Programming principles and in-memory storage. This initial phase delivers a fully functional command-line application that demonstrates clean architecture, proper separation of concerns, and adherence to Python best practices.
+- ✅ Persistent storage in PostgreSQL
+- ✅ SQLAlchemy ORM usage
+- ✅ Migration management with Alembic
+- ✅ Layered Architecture (Repository Pattern)
+- ✅ Automatic overdue task closure with Scheduler
+- ✅ Docker support for database
 
-### 🎯 Key Objectives
-- Implement core project and task management functionalities
-- Demonstrate clean architecture with layered design
-- Apply Python coding conventions and type hinting
-- Prepare foundation for future enhancements (persistence, web API, testing)
+## 📋 Prerequisites
 
-## 🚀 Features
+- Python 3.10+
+- Docker Desktop
+- Poetry (package manager)
 
-### 📁 Project Management
-- **Create Projects** with name (3-30 words) and description (max 150 words)
-- **Edit Projects** - modify name and description with validation
-- **Delete Projects** with automatic cascade deletion of associated tasks
-- **List Projects** - view all projects with IDs and descriptions
-- **Unique Naming** - prevent duplicate project names
-- **Configurable Limits** - maximum projects controlled via environment variables
+## 🚀 Installation & Setup
 
-### ✅ Task Management
-- **Add Tasks** to projects with title, description, status, and optional deadline
-- **Change Task Status** - update between `todo`, `doing`, and `done` states
-- **Edit Tasks** - modify title, description, and deadline
-- **Delete Tasks** - remove individual tasks from projects
-- **List Tasks** - view all tasks within a specific project
-- **Validation** - ensure valid statuses and future deadlines
-
-### ⚙️ System Features
-- **In-Memory Storage** - lightweight data persistence during runtime
-- **Environment Configuration** - customizable limits via `.env` file
-- **Comprehensive Error Handling** - meaningful error messages and validation
-- **Type Safety** - full type hinting throughout the codebase
-
-## 🛠 Installation & Setup
-
-### Prerequisites
-- Python 3.12 or higher
-- Poetry (dependency management)
-
-### Quick Start
+### 1. Clone the Project
 ```bash
-# Clone the repository
 git clone <repository-url>
 cd todolist
+```
 
-# Install dependencies using Poetry
+### 2. Install Dependencies
+```bash
 poetry install
+```
 
-# Configure environment (optional)
+### 3. Set Up Database with Docker
+```bash
+# Create .env file from template
 cp .env.example .env
-# Edit .env to adjust limits if needed
+
+# Edit .env and configure database information
+# Then run Docker:
+docker-compose up -d
+
+# Check status
+docker ps
 ```
 
-### Environment Configuration
-Create a `.env` file with the following variables:
-```env
-MAX_NUMBER_OF_PROJECTS=10
-MAX_NUMBER_OF_TASKS_PER_PROJECT=50
-```
-
-## 📖 Usage Guide
-
-### Starting the Application
+### 4. Run Migrations
 ```bash
-poetry run python main.py
+# Apply migrations
+poetry run alembic upgrade head
+
+# Check database connection
+poetry run python main.py db:check
 ```
 
-### Available Commands
+## 📖 Usage
 
-#### Project Commands
+### Main Commands
+
 ```bash
-create_project "Project Name" "Project Description"
-edit_project 1 "Updated Name" "Updated Description"
-delete_project 1
-list_projects
+# View help
+poetry run python main.py help
+
+# List tasks
+poetry run python main.py tasks:list
+
+# Create new task
+poetry run python main.py tasks:create
+
+# Complete task
+poetry run python main.py tasks:complete 1
+
+# Task statistics
+poetry run python main.py tasks:stats
 ```
 
-#### Task Commands
+### Scheduler (Automatic Overdue Task Closure)
+
 ```bash
-add_task 1 "Task Title" "Task Description" "todo" "2025-10-25"
-change_task_status 1 2 "doing"
-edit_task 1 2 "New Title" "New Description" "2025-10-26"
-delete_task 1 2
-list_tasks 1
+# Run once
+poetry run python main.py tasks:autoclose-overdue
+
+# Run in daemon mode (every 15 minutes)
+poetry run python main.py tasks:autoclose-overdue --daemon
 ```
 
-#### System Commands
-```bash
-help      # Display available commands
-exit      # Quit the application
-```
+## 🏗️ Project Structure
 
-### Example Session
-```bash
-> create_project "Learning Python" "Master Python programming concepts"
-✅ Project created successfully:
-   ID: 1, Name: Learning Python, Description: Master Python programming concepts
-
-> add_task 1 "Study OOP" "Learn classes, inheritance, and polymorphism" "todo"
-✅ Task added successfully:
-   ID: 1, Title: Study OOP, Status: todo
-
-> list_tasks 1
-📋 Tasks for 'Learning Python':
-   1. [todo] Study OOP - Learn classes, inheritance, and polymorphism
-```
-
-## 🏗 Project Architecture
-
-### Directory Structure
 ```
 todolist/
-├── todolist/
-│   ├── application/
-│   │   └── services.py     # Business logic services
-│   ├── domain/
-│   │   └── models.py       # Domain models (Project, Task)
-│   ├── infrastructure/
-│   │   └── repository.py   # In-memory storage
-│   └── config.py           # Environment config
-├── main.py                 # CLI entry point
-├── pyproject.toml          # Poetry config
-├── .env                    # Sample env file
-└── .gitignore              # Git ignore
+├── src\todolist/
+│   ├── domain/          # SQLAlchemy models
+│   ├── repositories/      # Data access layer
+│   ├── services/         # Business logic
+│   ├── cli/             # User interface
+│   ├── scheduler/       # Scheduled tasks
+│   └── db/              # Database configuration
+├── alembic/             # Migration files
+├── docker-compose.yml   # Docker configuration
+├── pyproject.toml       # Dependencies
+└── main.py              # Entry point
 ```
 
-## 🔧 Development
+## 🔄 Migration Workflow
 
-### Technology Stack
-- **Language**: Python 3.12+
-- **Dependency Management**: Poetry
-- **Code Quality**: Type hints, PEP8 compliance, comprehensive docstrings
-- **Version Control**: Git with conventional commits
+```bash
+# Create new migration after model changes
+poetry run alembic revision --autogenerate -m "description"
+
+# Apply migration
+poetry run alembic upgrade head
+
+# Revert to previous version
+poetry run alembic downgrade -1
+
+# View history
+poetry run alembic history
+```
+
+## 🐛 Troubleshooting
+
+### Database Connection Error
+
+```bash
+# Check Docker status
+docker ps
+
+# View PostgreSQL logs
+docker logs todolist-db
+
+# Restart database
+docker-compose restart
+```
+
+### Reset and Start Over
+
+```bash
+# Remove database and volumes
+docker-compose down -v
+
+# Restart
+docker-compose up -d
+poetry run alembic upgrade head
+```
+
+## 📚 Key Concepts
+
+### Repository Pattern
+Separation of data access logic from business logic
+
+### ORM (Object-Relational Mapping)
+Converting Python objects to database records
+
+### Migration
+Version control and management of database schema changes
+
+### Scheduler
+Automated execution of tasks at specified times

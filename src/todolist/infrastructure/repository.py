@@ -1,7 +1,7 @@
 from typing import Dict, List, Optional
 from datetime import datetime
-from todolist.domain.models import Project, Task, TaskStatus
-from todolist.config import Config
+from src.todolist.domain.models import Project, Task, TaskStatus
+from src.todolist.config import Config
 
 
 class InMemoryRepository:

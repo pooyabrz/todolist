@@ -1,64 +1,77 @@
-from dataclasses import dataclass, field
-from typing import List, Optional
 from datetime import datetime
-from enum import Enum
+from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, Index
+from sqlalchemy.orm import relationship
+from src.todolist.db.session import Base
 
 
-class TaskStatus(Enum):
-    """Enumeration for task statuses."""
-
-    TODO = "todo"
-    DOING = "doing"
-    DONE = "done"
-
-
-@dataclass
-class Task:
-    """Represents a task within a project.
-
-    Attributes:
-        id: Unique identifier for the task.
-        title: Title of the task (max 30 words).
-        description: Description of the task (max 150 words).
-        status: Current status of the task.
-        deadline: Optional deadline for the task.
+class Category(Base):
     """
-
-    id: int
-    title: str
-    description: str = ""
-    status: TaskStatus = TaskStatus.TODO
-    deadline: Optional[datetime] = None
-
-    def __post_init__(self):
-        """Post-initialization validation."""
-        if len(self.title.split()) > 30:
-            raise ValueError("Title exceeds 30 words")
-        if len(self.description.split()) > 150:
-            raise ValueError("Description exceeds 150 words")
-        if self.deadline and self.deadline < datetime.now():
-            raise ValueError("Deadline must be in the future")
-
-
-@dataclass
-class Project:
-    """Represents a project containing multiple tasks.
-
-    Attributes:
-        id: Unique identifier for the project.
-        name: Name of the project (max 30 words).
-        description: Description of the project (max 150 words).
-        tasks: List of tasks associated with the project.
+    Category model for task categorization.
     """
+    __tablename__ = 'categories'
+    
+    # Primary key
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    
+    # Category attributes
+    name = Column(String(100), unique=True, nullable=False, index=True)
+    description = Column(Text, nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    tasks = relationship(
+        "Task",
+        back_populates="category",
+        cascade="all, delete-orphan",  # Delete tasks when category is deleted
+        lazy="dynamic"  # Load tasks on demand
+    )
+    
+    def __repr__(self):
+        return f"<Category(id={self.id}, name='{self.name}')>"
 
-    id: int
-    name: str
-    description: str = ""
-    tasks: List[Task] = field(default_factory=list)
 
-    def __post_init__(self):
-        """Post-initialization validation."""
-        if len(self.name.split()) > 30:
-            raise ValueError("Name exceeds 30 words")
-        if len(self.description.split()) > 150:
-            raise ValueError("Description exceeds 150 words")
+class Task(Base):
+    """
+    Task model representing a todo item.
+    """
+    __tablename__ = 'tasks'
+    
+    # Primary key
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    
+    # Task attributes
+    title = Column(String(200), nullable=False, index=True)
+    description = Column(Text, nullable=True)
+    priority = Column(Integer, default=2, nullable=False)  # 1=Low, 2=Medium, 3=High
+    is_completed = Column(Boolean, default=False, nullable=False, index=True)
+    
+    # Dates
+    due_date = Column(DateTime, nullable=True, index=True)
+    completed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Foreign key
+    category_id = Column(Integer, ForeignKey('categories.id', ondelete='SET NULL'), nullable=True)
+    
+    # Relationships
+    category = relationship("Category", back_populates="tasks")
+    
+    # Composite indexes for common queries
+    __table_args__ = (
+        Index('idx_task_status_priority', 'is_completed', 'priority'),
+        Index('idx_task_due_date_status', 'due_date', 'is_completed'),
+    )
+    
+    def __repr__(self):
+        return f"<Task(id={self.id}, title='{self.title}', completed={self.is_completed})>"
+    
+    @property
+    def is_overdue(self):
+        """Check if task is overdue."""
+        if self.due_date and not self.is_completed:
+            return datetime.utcnow() > self.due_date
+        return False
