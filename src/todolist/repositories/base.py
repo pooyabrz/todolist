@@ -1,6 +1,6 @@
 from typing import Generic, TypeVar, Type, List, Optional
 from sqlalchemy.orm import Session
-from todolist.db.session import Base
+from src.todolist.db.session import Base
 
 # Generic type for model
 ModelType = TypeVar("ModelType", bound=Base)

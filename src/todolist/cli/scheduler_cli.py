@@ -1,7 +1,7 @@
 import sys
-from todolist.db.session import SessionLocal
-from todolist.repositories.task_repository import TaskRepository
-from todolist.scheduler.tasks import run_scheduler, close_overdue_tasks
+from src.todolist.db.session import SessionLocal
+from src.todolist.repositories.task_repository import TaskRepository
+from src.todolist.scheduler.tasks import run_scheduler, close_overdue_tasks
 
 
 def run_autoclose_once():

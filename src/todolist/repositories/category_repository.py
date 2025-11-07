@@ -1,6 +1,6 @@
 from typing import Optional
 from sqlalchemy.orm import Session
-from todolist.domain.models import Category
+from src.todolist.domain.models import Category
 from .base import BaseRepository
 
 

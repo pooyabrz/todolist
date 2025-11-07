@@ -1,8 +1,8 @@
 import schedule
 import time
 from datetime import datetime
-from todolist.db.session import SessionLocal
-from todolist.repositories.task_repository import TaskRepository
+from src.todolist.db.session import SessionLocal
+from src.todolist.repositories.task_repository import TaskRepository
 
 
 def close_overdue_tasks():

@@ -1,9 +1,9 @@
 from typing import List, Optional
 from datetime import datetime
 from sqlalchemy.orm import Session
-from todolist.domain.models import Task
-from todolist.repositories.task_repository import TaskRepository
-from todolist.repositories.category_repository import CategoryRepository
+from src.todolist.domain.models import Task
+from src.todolist.repositories.task_repository import TaskRepository
+from src.todolist.repositories.category_repository import CategoryRepository
 
 
 class TaskService:
