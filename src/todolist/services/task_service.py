@@ -1,6 +1,7 @@
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import datetime
 from sqlalchemy.orm import Session
+
 from src.todolist.domain.models import Task
 from src.todolist.repositories.task_repository import TaskRepository
 from src.todolist.repositories.category_repository import CategoryRepository
@@ -8,42 +9,45 @@ from src.todolist.repositories.category_repository import CategoryRepository
 
 class TaskService:
     """
-    Service class for task-related business logic.
-    Orchestrates operations between repositories.
+    Service class handling all task-related business logic.
+    Acts as an orchestrator between repositories and presentation layer.
     """
-    
+
     def __init__(self, db: Session):
         """
-        Initialize service with database session.
-        
-        Args:
-            db: Database session
+        Initialize the service with a database session.
+        Creates instances of required repositories.
         """
         self.db = db
         self.task_repo = TaskRepository(db)
         self.category_repo = CategoryRepository(db)
-    
-    def get_all_tasks(self) -> List[Task]:
+
+    def get_tasks(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        completed: Optional[bool] = None,
+        search: Optional[str] = None,
+    ) -> List[Task]:
         """
-        Get all tasks with their categories.
-        
-        Returns:
-            List of all tasks
+        Get a paginated list of tasks with optional filtering and search.
+        Categories are eagerly loaded for API responses.
+        Used by GET /tasks endpoint.
         """
-        return self.task_repo.get_all_with_category()
-    
+        return self.task_repo.get_tasks(
+            skip=skip,
+            limit=limit,
+            completed=completed,
+            search=search
+        )
+
     def get_task_by_id(self, task_id: int) -> Optional[Task]:
         """
-        Get task by ID.
-        
-        Args:
-            task_id: Task ID
-            
-        Returns:
-            Task or None if not found
+        Retrieve a single task by ID with its category eagerly loaded.
+        Used by GET /tasks/{task_id}.
         """
-        return self.task_repo.get_by_id(task_id)
-    
+        return self.task_repo.get_by_id_with_category(task_id)
+
     def create_task(
         self,
         title: str,
@@ -53,25 +57,16 @@ class TaskService:
         category_name: Optional[str] = None
     ) -> Task:
         """
-        Create a new task.
-        
-        Args:
-            title: Task title
-            description: Task description (optional)
-            priority: Priority level 1-3 (default: 2)
-            due_date: Due date (optional)
-            category_name: Category name (optional)
-            
-        Returns:
-            Created task
+        Create a new task with optional category.
+        If category_name is provided, it will be created if not exists.
+        Returns the created task with category loaded (for API response).
         """
-        # Handle category
         category_id = None
         if category_name:
-            category = self.category_repo.get_or_create(name=category_name)
+            category = self.category_repo.get_or_create(name=category_name.strip())
             category_id = category.id
-        
-        # Create task
+
+        # Create the task using repository
         task = self.task_repo.create(
             title=title,
             description=description,
@@ -79,9 +74,10 @@ class TaskService:
             due_date=due_date,
             category_id=category_id
         )
-        
-        return task
-    
+
+        # Re-fetch with category eagerly loaded so it's included in JSON response
+        return self.task_repo.get_by_id_with_category(task.id)
+
     def update_task(
         self,
         task_id: int,
@@ -93,25 +89,16 @@ class TaskService:
     ) -> Optional[Task]:
         """
         Update an existing task.
-        
-        Args:
-            task_id: Task ID
-            title: New title (optional)
-            description: New description (optional)
-            priority: New priority (optional)
-            due_date: New due date (optional)
-            category_name: New category name (optional)
-            
-        Returns:
-            Updated task or None if not found
+        Only provided fields are updated.
+        Handles category assignment or removal.
+        Returns updated task with category loaded, or None if not found.
         """
         task = self.task_repo.get_by_id(task_id)
         if not task:
             return None
-        
-        # Prepare update data
-        update_data = {}
-        
+
+        update_data: Dict[str, any] = {}
+
         if title is not None:
             update_data['title'] = title
         if description is not None:
@@ -120,98 +107,71 @@ class TaskService:
             update_data['priority'] = priority
         if due_date is not None:
             update_data['due_date'] = due_date
-        
-        # Handle category
+
+        # Handle category update
         if category_name is not None:
-            if category_name:
-                category = self.category_repo.get_or_create(name=category_name)
+            if category_name.strip():
+                category = self.category_repo.get_or_create(name=category_name.strip())
                 update_data['category_id'] = category.id
             else:
-                update_data['category_id'] = None
-        
-        # Update task
-        return self.task_repo.update(task_id, **update_data)
-    
-    def delete_task(self, task_id: int) -> bool:
-        """
-        Delete a task.
-        
-        Args:
-            task_id: Task ID
-            
-        Returns:
-            True if deleted, False if not found
-        """
-        return self.task_repo.delete(task_id)
-    
+                update_data['category_id'] = None  # Remove category
+
+        # Perform update
+        updated_task = self.task_repo.update(task_id, **update_data)
+        if updated_task:
+            # Reload with category for consistent API response
+            return self.task_repo.get_by_id_with_category(task_id)
+        return None
+
     def complete_task(self, task_id: int) -> Optional[Task]:
         """
-        Mark task as completed.
-        
-        Args:
-            task_id: Task ID
-            
-        Returns:
-            Updated task or None if not found
+        Mark a task as completed.
+        Sets is_completed=True and completed_at timestamp.
+        Returns updated task with category loaded.
         """
-        return self.task_repo.mark_as_completed(task_id)
-    
-    def get_pending_tasks(self) -> List[Task]:
+        task = self.task_repo.mark_as_completed(task_id)
+        if task:
+            return self.task_repo.get_by_id_with_category(task_id)
+        return None
+
+    def delete_task(self, task_id: int) -> bool:
         """
-        Get all pending (incomplete) tasks.
-        
-        Returns:
-            List of pending tasks
+        Delete a task permanently.
+        Returns True if deleted, False if not found.
         """
-        return self.task_repo.get_by_status(is_completed=False)
-    
-    def get_completed_tasks(self) -> List[Task]:
-        """
-        Get all completed tasks.
-        
-        Returns:
-            List of completed tasks
-        """
-        return self.task_repo.get_by_status(is_completed=True)
-    
-    def get_tasks_by_priority(self, priority: int) -> List[Task]:
-        """
-        Get tasks by priority level.
-        
-        Args:
-            priority: Priority level (1-3)
-            
-        Returns:
-            List of tasks with specified priority
-        """
-        return self.task_repo.get_by_priority(priority)
-    
-    def search_tasks(self, keyword: str) -> List[Task]:
-        """
-        Search tasks by keyword.
-        
-        Args:
-            keyword: Search keyword
-            
-        Returns:
-            List of matching tasks
-        """
-        return self.task_repo.search_tasks(keyword)
-    
-    def get_overdue_tasks(self) -> List[Task]:
-        """
-        Get all overdue tasks.
-        
-        Returns:
-            List of overdue tasks
-        """
-        return self.task_repo.get_overdue_tasks()
-    
+        return self.task_repo.delete(task_id)
+
     def get_statistics(self) -> dict:
         """
-        Get task statistics.
-        
-        Returns:
-            Dictionary with statistics
+        Get current task statistics.
+        Used by GET /tasks/stats endpoint.
         """
         return self.task_repo.get_statistics()
+
+    # Legacy methods kept for backward compatibility (CLI, tests, etc.)
+    # These were part of Phase 2 and remain unchanged
+
+    def get_all_tasks(self) -> List[Task]:
+        """Legacy: Get all tasks with categories (used in CLI)"""
+        return self.task_repo.get_all_with_category()
+
+    def get_pending_tasks(self) -> List[Task]:
+        """Get all incomplete tasks"""
+        return self.task_repo.get_by_status(is_completed=False)
+
+    def get_completed_tasks(self) -> List[Task]:
+        """Get all completed tasks"""
+        return self.task_repo.get_by_status(is_completed=True)
+
+    def get_tasks_by_priority(self, priority: int) -> List[Task]:
+        """Filter tasks by priority level"""
+        return self.task_repo.get_by_priority(priority)
+
+    def search_tasks(self, keyword: str) -> List[Task]:
+        """Search in title and description"""
+        return self.task_repo.search_tasks(keyword)
+
+    def get_overdue_tasks(self) -> List[Task]:
+        """Get tasks past due date and not completed"""
+        return self.task_repo.get_overdue_tasks()
+    
