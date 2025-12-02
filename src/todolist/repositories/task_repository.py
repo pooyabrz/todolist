@@ -153,3 +153,46 @@ class TaskRepository(BaseRepository[Task]):
             'pending': pending,
             'overdue': overdue
         }
+    def get_tasks(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        completed: Optional[bool] = None,
+        search: Optional[str] = None,
+    ) -> List[Task]:
+        """
+        Get tasks with pagination, filtering and search (for API layer).
+        Category is eagerly loaded.
+        """
+        query = self.db.query(self.model).options(joinedload(Task.category))
+
+        if completed is not None:
+            query = query.filter(Task.is_completed == completed)
+
+        if search:
+            pattern = f"%{search}%"
+            query = query.filter(
+                or_(
+                    Task.title.ilike(pattern),
+                    Task.description.ilike(pattern)
+                )
+            )
+
+        query = query.order_by(
+            Task.is_completed.asc(),
+            Task.due_date.asc().nulls_last(),
+            Task.id.desc()
+        )
+
+        return query.offset(skip).limit(limit).all()
+
+    def get_by_id_with_category(self, task_id: int) -> Optional[Task]:
+        """
+        Get single task with category eagerly loaded.
+        """
+        return (
+            self.db.query(self.model)
+            .options(joinedload(Task.category))
+            .filter(Task.id == task_id)
+            .first()
+        )
